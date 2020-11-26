@@ -1,0 +1,79 @@
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Raymarching Test</title>
+    <style type="text/css">
+        body {
+            background: rgb(46, 46, 46);
+            margin: 0;
+            padding: 15px;
+            text-align: center;
+        }
+    </style>
+    <script type="text/javascript" src="https://rawgit.com/patriciogonzalezvivo/glslCanvas/master/dist/GlslCanvas.js"></script>
+    <script type="text/javascript" src="dat.gui.min.js"></script>
+</head>
+<body>
+    <script>
+        const canvas = document.createElement("canvas");
+        const gui = new dat.GUI();
+        setCanvasDimensions();
+        document.body.appendChild(canvas);
+        const sandbox = new GlslCanvas(canvas);
+
+
+        function setCanvasDimensions(){
+            // sandbox.resize() seems to change canvas's height
+            // use 1 / 2 instead of full size to avoid going offscreen
+            canvas.width = window.innerWidth / 2;
+            canvas.height = window.innerHeight / 2;
+        }
+
+        window.addEventListener('resize', setCanvasDimensions);
+
+        // Load fragment shader for raymarching
+        const xhr = new XMLHttpRequest();
+        xhr.onreadystatechange = function() {
+            if (this.readyState == 4 && this.status == 200) {
+                sandbox.load(this.responseText);
+                setUniforms();
+            }
+        };
+        xhr.open("GET", "raymarcher.glsl");
+        xhr.send();
+
+
+        // uniforms to pass into shader
+        const uniforms = {
+            SKY_COLOR: [22, 22, 22],
+            cube_color_1: [41, 154, 199],
+            cube_color_2: [66, 31, 90],
+            LIGHT_COLOR: [255, 255, 255],
+            MAX_REFLECTIONS: 5,
+            FOG_DENSITY: .2,
+            CUTOUT_RADIUS: .13
+        };
+
+        function setUniforms () {
+            for(const [uniformName, value] of Object.entries(uniforms)){
+                if(typeof(value) == "number") {
+                    sandbox.setUniform(uniformName, value);
+                } else {
+                    // map colors from [0, 255] to [0, 1]
+                    sandbox.setUniform(uniformName, value[0] / 255, value[1] / 255, value[2] / 255);
+                }
+            }
+        };
+
+        // GUI controls for uniforms
+        gui.addColor(uniforms, "SKY_COLOR").name("Sky Color").onFinishChange(setUniforms);
+        gui.addColor(uniforms, "LIGHT_COLOR").name("Light Color").onFinishChange(setUniforms);
+        gui.addColor(uniforms, "cube_color_1").name("Primary Cubes").onFinishChange(setUniforms);
+        gui.addColor(uniforms, "cube_color_2").name("Secondary Cubes").onFinishChange(setUniforms);
+        gui.add(uniforms, "MAX_REFLECTIONS", 0, 5, 1).name("Max Reflections").onFinishChange(setUniforms);
+        gui.add(uniforms, "CUTOUT_RADIUS", 0, .5, .01).name("Cutout Radius").onFinishChange(setUniforms);
+    </script>
+    
+</body>
+</html>
