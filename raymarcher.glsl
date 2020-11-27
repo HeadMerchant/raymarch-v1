@@ -14,12 +14,19 @@ uniform vec3 cube_color_1, cube_color_2;
 uniform vec3 LIGHT_COLOR;
 uniform float MAX_REFLECTIONS;
 uniform float CUTOUT_RADIUS;
+uniform float NOISE_STRENGTH;   
 // uniform int FOG_COLOR
 #define FOG_COLOR SKY_COLOR
 uniform float FOG_DENSITY;
-#define FOG_SAMPLES 20.
-#define FOG_SAMPLE_DIST .1
-#define FOG_WEIGHT 1./20.
+#define FOG_SAMPLES 40.
+uniform float FOG_SAMPLE_DIST;
+#define FOG_WEIGHT 1./FOG_SAMPLES
+
+float random (vec3 st) {
+    return fract(sin(dot(st,
+                         vec3(12.9898,78.233,59.934)))*
+        43758.5453123);
+}
 
 mat3 rotationY( in float angle ) {
 	return mat3(	cos(angle),		0,		sin(angle),
@@ -125,7 +132,7 @@ vec3 render(vec3 rayDir, vec3 rayOrigin, out vec3 hitPoint, out vec3 hitNormal, 
         color += emission;
     }
     else{
-        color = SKY_COLOR;//skyColor(rayDir);
+        color = vec3(0.);//skyColor(rayDir);
     }
     return color;
 }
@@ -154,16 +161,16 @@ void main() {
     // Initial color
     color = render(rayDir, rayOrigin, p, n, c, d);
     // Volumetric fog light samples
-    float d0 = d;
     float foglight, fogStrength;
     float sampleWeight = FOG_WEIGHT;
+    vec3 fogRayOrigin = rayOrigin + (random(vec3(uv, u_time)) * 2. - 1.)*NOISE_STRENGTH*rayDir;
     for(float j = 1.; j < FOG_SAMPLES+1.; j++){
         float currentD = j*FOG_SAMPLE_DIST;
-        vec3 p = rayOrigin + r*currentD;
-        //FAKE LIGHT SAMPLING; only works for 
-        pMod3(p, vec3(2.));
-        p = abs(p);
-        foglight += step(0.3, min(p.x, p.z));
+        vec3 p = fogRayOrigin + r*currentD;
+        //Sample lighting from nearby cubes
+        vec3 lightP = mod(p-.5, 4.);
+        foglight += (lightP.x * lightP.y * lightP.z) / length(lightP) * .3;
+        // foglight += step(0.3, min(p.x, p.z));
         
         if(currentD > d){
             sampleWeight = 1./j;
@@ -171,6 +178,9 @@ void main() {
         }
     }
     foglight *= sampleWeight;
+    
+    // Initial hit distance; for fog
+    float d0 = d;
 
     // Reflections
     for(float i = 1.; i < 5.; i++){
@@ -190,6 +200,6 @@ void main() {
     }
     
     // Apply fog
-    totalColor += mix(foglight*FOG_COLOR, color, exp(-FOG_DENSITY*d0));
+    totalColor = mix(foglight*FOG_COLOR*LIGHT_COLOR, color, exp(-FOG_DENSITY*d0));
     gl_FragColor = vec4(totalColor, 1.0);
 }
